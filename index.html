@@ -83,7 +83,9 @@ let model;
 let stream;
 let camera="environment";
 let started=false;
+
 let lastSpoken="";
+let lastSpeakTime=0;
 
 // O‘zbekcha nomlar
 const uz = {
@@ -100,7 +102,47 @@ const uz = {
 "cat":"mushuk"
 };
 
+//  OVOZNI YOQISH (MUHIM)
+function unlockVoice(){
+const msg = new SpeechSynthesisUtterance(" ");
+speechSynthesis.speak(msg);
+}
+
+//  OVOZ FUNKSIYA (FIXED)
+function speak(text){
+
+if(!text) return;
+
+// takrorlamaslik
+if(text===lastSpoken) return;
+
+// delay (4 sekund)
+let now = Date.now();
+if(now - lastSpeakTime < 4000) return;
+
+lastSpoken = text;
+lastSpeakTime = now;
+
+speechSynthesis.cancel();
+
+const msg = new SpeechSynthesisUtterance(text);
+
+// fallback voice
+let voices = speechSynthesis.getVoices();
+let voice = voices.find(v=>v.lang.includes("ru") || v.lang.includes("en"));
+
+if(voice) msg.voice = voice;
+
+msg.rate = 1;
+msg.pitch = 1;
+
+speechSynthesis.speak(msg);
+}
+
+// APP START
 async function startApp(){
+
+unlockVoice(); //  MUHIM
 
 if(started) return;
 started=true;
@@ -116,12 +158,17 @@ alert("Xatolik: "+e.message);
 
 }
 
+// CAMERA
 async function startCamera(){
 
 if(stream) stream.getTracks().forEach(t=>t.stop());
 
 stream = await navigator.mediaDevices.getUserMedia({
-video:{facingMode:camera}
+video:{
+facingMode:camera,
+width:{ideal:1280},
+height:{ideal:720}
+}
 });
 
 video.srcObject=stream;
@@ -130,11 +177,13 @@ await video.play();
 
 }
 
+// CAMERA SWITCH
 function switchCamera(){
 camera = camera==="environment" ? "user" : "environment";
 if(started) startCamera();
 }
 
+// AI LOAD
 async function loadAI(){
 document.getElementById("info").innerText="AI yuklanmoqda...";
 model = await cocoSsd.load();
@@ -142,17 +191,7 @@ document.getElementById("info").innerText="AI tayyor!";
 detect();
 }
 
-function speak(text){
-
-if(lastSpoken===text) return; // takrorlamaslik
-lastSpoken=text;
-
-const msg = new SpeechSynthesisUtterance(text);
-msg.lang="uz-UZ";
-speechSynthesis.speak(msg);
-
-}
-
+// DETECTION
 function detect(){
 
 setInterval(async()=>{
@@ -178,6 +217,8 @@ const [x,y,w,h]=p.bbox;
 
 ctx.strokeStyle="cyan";
 ctx.lineWidth=3;
+ctx.shadowColor="cyan";
+ctx.shadowBlur=15;
 ctx.strokeRect(x,y,w,h);
 
 const name = uz[p.class] || p.class;
@@ -188,21 +229,23 @@ ctx.fillText(name, x, y>10?y-5:10);
 
 });
 
-// TEXT
+// TEXT + VOICE
 let text="";
 let voiceText="";
 
 for(let item in counts){
+
 let name = uz[item] || item;
 let count = counts[item];
 
 text += name + " : " + count + "<br>";
 voiceText += count + " ta " + name + ", ";
+
 }
 
 document.getElementById("info").innerHTML = text || "Hech narsa topilmadi";
 
-//  ovoz chiqaradi
+//  GAPIRADI
 if(voiceText){
 speak(voiceText);
 }
