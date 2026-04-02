@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>Taiman AI PRO Kamera</title>
+<title>Taiman AI PRO MAX</title>
 
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
@@ -16,11 +16,6 @@ background:#000;
 color:#0ff;
 font-family:Arial;
 text-align:center;
-}
-
-h2{
-margin:10px;
-text-shadow:0 0 10px cyan;
 }
 
 #container{
@@ -66,7 +61,7 @@ cursor:pointer;
 
 <body>
 
-<h2> Taiman AI PRO Kamera</h2>
+<h2> Taiman AI PRO MAX</h2>
 
 <div id="container">
 <video id="video" autoplay playsinline muted></video>
@@ -88,20 +83,21 @@ let model;
 let stream;
 let camera="environment";
 let started=false;
+let lastSpoken="";
 
-// O‘zbekcha tarjima
+// O‘zbekcha nomlar
 const uz = {
-"person":"Inson",
-"bottle":"Shisha",
-"cell phone":"Telefon",
-"chair":"Stul",
-"cup":"Chashka",
-"laptop":"Noutbuk",
-"tv":"Televizor",
-"potted plant":"O‘simlik",
-"book":"Kitob",
-"dog":"It",
-"cat":"Mushuk"
+"person":"inson",
+"bottle":"shisha",
+"cell phone":"telefon",
+"chair":"stul",
+"cup":"chashka",
+"laptop":"noutbuk",
+"tv":"televizor",
+"potted plant":"o‘simlik",
+"book":"kitob",
+"dog":"it",
+"cat":"mushuk"
 };
 
 async function startApp(){
@@ -109,13 +105,13 @@ async function startApp(){
 if(started) return;
 started=true;
 
-document.getElementById("info").innerText="Kamera ruxsati so‘ralmoqda...";
+document.getElementById("info").innerText="Kamera ruxsati...";
 
 try{
 await startCamera();
 await loadAI();
 }catch(e){
-alert("Xatolik: " + e.message);
+alert("Xatolik: "+e.message);
 }
 
 }
@@ -124,29 +120,13 @@ async function startCamera(){
 
 if(stream) stream.getTracks().forEach(t=>t.stop());
 
-try{
-
 stream = await navigator.mediaDevices.getUserMedia({
-video:{
-facingMode:camera,
-width:{ideal:1280},
-height:{ideal:720}
-}
+video:{facingMode:camera}
 });
 
-video.srcObject = stream;
+video.srcObject=stream;
 
-//  MUHIM FIX
 await video.play();
-
-video.onloadedmetadata = ()=>{
-video.play();
-};
-
-}catch(e){
-alert("Kamera ishlamadi: " + e.message);
-throw e;
-}
 
 }
 
@@ -156,13 +136,20 @@ if(started) startCamera();
 }
 
 async function loadAI(){
-
 document.getElementById("info").innerText="AI yuklanmoqda...";
-
 model = await cocoSsd.load();
-
 document.getElementById("info").innerText="AI tayyor!";
 detect();
+}
+
+function speak(text){
+
+if(lastSpoken===text) return; // takrorlamaslik
+lastSpoken=text;
+
+const msg = new SpeechSynthesisUtterance(text);
+msg.lang="uz-UZ";
+speechSynthesis.speak(msg);
 
 }
 
@@ -172,13 +159,11 @@ setInterval(async()=>{
 
 if(!video.videoWidth) return;
 
-canvas.width = video.videoWidth;
-canvas.height = video.videoHeight;
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
 
 const predictions = await model.detect(video);
-
-//  mayda obyektlar uchun
-const filtered = predictions.filter(p=>p.score > 0.2);
+const filtered = predictions.filter(p=>p.score>0.3);
 
 ctx.clearRect(0,0,canvas.width,canvas.height);
 
@@ -191,32 +176,38 @@ counts[p.class]++;
 
 const [x,y,w,h]=p.bbox;
 
-// HUD box
 ctx.strokeStyle="cyan";
 ctx.lineWidth=3;
-ctx.shadowColor="cyan";
-ctx.shadowBlur=15;
 ctx.strokeRect(x,y,w,h);
 
 const name = uz[p.class] || p.class;
 
-// label
 ctx.fillStyle="cyan";
 ctx.font="16px Arial";
-ctx.fillText(name+" "+Math.round(p.score*100)+"%", x, y>10?y-5:10);
+ctx.fillText(name, x, y>10?y-5:10);
 
 });
 
-// natija
+// TEXT
 let text="";
+let voiceText="";
+
 for(let item in counts){
 let name = uz[item] || item;
-text += name + " : " + counts[item] + "<br>";
+let count = counts[item];
+
+text += name + " : " + count + "<br>";
+voiceText += count + " ta " + name + ", ";
 }
 
 document.getElementById("info").innerHTML = text || "Hech narsa topilmadi";
 
-},200);
+//  ovoz chiqaradi
+if(voiceText){
+speak(voiceText);
+}
+
+},1500);
 
 }
 
